@@ -9,6 +9,14 @@ import mlx.nn as nn
 import functools
 
 # loss functions
+def _apply_reduction(loss: mx.array, reduction: str) -> mx.array:
+    if reduction == "mean":
+        return mx.mean(loss)
+    if reduction == "sum":
+        return mx.sum(loss)
+    raise ValueError(f"reduction must be 'mean' or 'sum', got '{reduction}'")
+
+
 def cross_entropy(
     logits: mx.array,
     targets: mx.array,
@@ -25,7 +33,7 @@ def cross_entropy(
         Scalar loss value.
     """
     loss = nn.losses.cross_entropy(logits=logits, targets=targets)
-    return mx.mean(loss) if reduction == "mean" else mx.sum(loss)
+    return _apply_reduction(loss, reduction)
 
 def mse(
     predictions: mx.array,
@@ -43,7 +51,7 @@ def mse(
         Scalar loss value.
     """
     loss = (predictions - targets) ** 2
-    return mx.mean(loss) if reduction == "mean" else mx.sum(loss)
+    return _apply_reduction(loss, reduction)
 
 def binary_cross_entropy(
     logits: mx.array,
@@ -63,7 +71,7 @@ def binary_cross_entropy(
         Scalar loss value.
     """
     loss = mx.maximum(logits, 0) - logits * targets + mx.log(1 + mx.exp(-mx.abs(logits)))
-    return mx.mean(loss) if reduction == "mean" else mx.sum(loss)
+    return _apply_reduction(loss, reduction)
 
 
 def huber(
@@ -87,7 +95,7 @@ def huber(
     """
     err = mx.abs(predictions - targets)
     loss = mx.where(err <= delta, 0.5 * err ** 2, delta * (err - 0.5 * delta))
-    return mx.mean(loss) if reduction == "mean" else mx.sum(loss)
+    return _apply_reduction(loss, reduction)
 
 
 # regularization
@@ -107,7 +115,7 @@ def l2_regularization(
         Scalar penalty to add to the task loss.
     """
     terms = [mx.sum(p ** 2) for p in params.values()]
-    return lam * functools.reduce(mx.add, terms)
+    return lam * functools.reduce(mx.add, terms, mx.array(0.0))
 
 def l1_regularization(
     params: dict[str, mx.array],
@@ -125,4 +133,4 @@ def l1_regularization(
         Scalar penalty to add to the task loss.
     """
     terms = [mx.sum(mx.abs(p)) for p in params.values()]
-    return lam * functools.reduce(mx.add, terms)
+    return lam * functools.reduce(mx.add, terms, mx.array(0.0))

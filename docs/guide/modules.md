@@ -50,7 +50,7 @@ params = model.parameters()
 
 ## Training and eval mode
 
-`model.train()` and `model.eval()` recursively toggle the `training` flag on all submodules that have one (currently `Dropout`).
+`model.train()` and `model.eval()` recursively toggle the `training` flag on all submodules that have one (`Dropout` and `BatchNorm1d`/`BatchNorm2d`).
 
 ```python
 model.train()   # Dropout active
@@ -92,21 +92,68 @@ nn.MaxPool2d(kernel_size=2)
 ### Activations
 
 ```python
-nn.ReLU()           # max(x, 0)
-nn.GELU()           # Gaussian Error Linear Unit
-nn.Softmax(axis=-1) # softmax along last dim
+nn.ReLU()                          # max(x, 0)
+nn.GELU()                          # Gaussian Error Linear Unit
+nn.Softmax(axis=-1)                # softmax along last dim
+nn.Sigmoid()                       # 1 / (1 + exp(-x)), binary output
+nn.Tanh()                          # tanh(x), range (-1, 1)
+nn.LeakyReLU(negative_slope=0.01)  # slope * x for x < 0
 ```
 
 ### Dropout
 
 ```python
-nn.Dropout(p=0.3)   # drop 30% of activations during training
+nn.Dropout(p=0.3)   # drop 30% of activations during training; p must be in [0, 1)
 ```
 
 ### LayerNorm
 
 ```python
 nn.LayerNorm(dims=256)   # normalise over last dimension
+```
+
+### BatchNorm1d / BatchNorm2d
+
+Normalise over the batch dimension with learnable scale and shift. Tracks running statistics for use at eval time.
+
+```python
+nn.BatchNorm1d(num_features=256)          # input (N, C)
+nn.BatchNorm2d(num_features=32)           # input (N, H, W, C) — channels-last
+```
+
+Running stats (`_running_mean`, `_running_var`) are **persistent buffers**: saved/loaded by `save()`/`load()` but excluded from gradient computation and optimizer updates.
+
+### Embedding
+
+Lookup table mapping integer token indices to dense vectors.
+
+```python
+nn.Embedding(num_embeddings=10000, embedding_dim=128)
+tokens = mx.array([[1, 42, 7]])   # (1, 3) int
+out = embed(tokens)               # (1, 3, 128)
+```
+
+### Sequential
+
+Chains modules in order — output of each layer feeds the next.
+
+```python
+model = nn.Sequential(
+    nn.Linear(784, 256), nn.ReLU(),
+    nn.Linear(256, 10),
+)
+out = model(x)
+```
+
+### ModuleList
+
+Stores a list of modules and registers their parameters. Use when you need manual iteration (e.g. residual connections).
+
+```python
+self.layers = nn.ModuleList([nn.Linear(64, 64) for _ in range(4)])
+# in forward:
+for i in range(len(self.layers)):
+    x = x + self.layers[i](x)
 ```
 
 ---

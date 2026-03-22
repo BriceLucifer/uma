@@ -31,8 +31,3 @@ class LayerNorm(Module):
         var = mx.var(x, axis=-1, keepdims=True)
         x_norm = (x - mean) / mx.sqrt(var + self.eps)
         return self.weight * x_norm + self.bias
-'''
-公式就是：
-x_norm = (x - mean) / sqrt(var + eps)
-output = gamma * x_norm + beta
-'''

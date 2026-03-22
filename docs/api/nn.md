@@ -46,6 +46,24 @@ Neural network modules. All layers inherit from `Module`.
 
 ---
 
+## Sigmoid
+
+::: uma.nn.Sigmoid
+
+---
+
+## Tanh
+
+::: uma.nn.Tanh
+
+---
+
+## LeakyReLU
+
+::: uma.nn.LeakyReLU
+
+---
+
 ## Dropout
 
 ::: uma.nn.Dropout
@@ -55,3 +73,33 @@ Neural network modules. All layers inherit from `Module`.
 ## LayerNorm
 
 ::: uma.nn.LayerNorm
+
+---
+
+## BatchNorm1d
+
+::: uma.nn.BatchNorm1d
+
+---
+
+## BatchNorm2d
+
+::: uma.nn.BatchNorm2d
+
+---
+
+## Embedding
+
+::: uma.nn.Embedding
+
+---
+
+## Sequential
+
+::: uma.nn.Sequential
+
+---
+
+## ModuleList
+
+::: uma.nn.ModuleList

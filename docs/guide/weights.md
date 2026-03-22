@@ -11,7 +11,7 @@ model.save("checkpoint")       # writes checkpoint.npz
 model.save("checkpoints/ep10") # directories must exist
 ```
 
-All parameters are stored under their dotted key names (dots replaced with `/` inside the zip).
+All parameters **and persistent buffers** (e.g. BatchNorm running stats) are stored under their dotted key names (dots replaced with `/` inside the zip).
 
 ---
 
@@ -31,9 +31,10 @@ The model architecture must match — key names and shapes must be identical to 
 For manual control over what gets saved or loaded:
 
 ```python
-# get the parameter dict
+# get the full state dict (trainable parameters + persistent buffers)
 sd = model.state_dict()
-# {"fc1.weight": mx.array(...), "fc1.bias": mx.array(...), ...}
+# {"fc1.weight": mx.array(...), "fc1.bias": mx.array(...),
+#  "bn._running_mean": mx.array(...), "bn._running_var": mx.array(...), ...}
 
 # load into another model (strict by default)
 model2.load_state_dict(sd)

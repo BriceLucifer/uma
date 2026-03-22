@@ -101,7 +101,7 @@ history = trainer.fit(loader, epochs=10)
 model.save("my_model")
 ```
 
-See [`example/mnist.py`](example/mnist.py) for a complete CNN training example and [`example/test_saving_loading.py`](example/test_saving_loading.py) for a save/load round-trip test.
+See [`example/mnist.py`](example/mnist.py) for a complete CNN training example, [`example/new_features_demo.py`](example/new_features_demo.py) for a tour of all layers and schedulers, [`example/test_saving_loading.py`](example/test_saving_loading.py) for a save/load round-trip test, and [`example/test_uma.py`](example/test_uma.py) for the unit test suite (67 tests — run with `uv run python example/test_uma.py`).
 
 ---
 
@@ -192,10 +192,11 @@ class MyLayer(nn.Module):
 | `train()` | Sets all submodules to training mode (activates Dropout). |
 | `eval()` | Sets all submodules to eval mode (disables Dropout). |
 | `named_modules()` | Yields `(name, module)` for self and all descendants. |
-| `state_dict()` | Returns a copy of all parameters (same as `parameters()`). |
-| `load_state_dict(sd, strict=True)` | Load a flat parameter dict. |
-| `save(path)` | Save parameters to `path.npz`. |
-| `load(path)` | Load parameters from a `.npz` file. |
+| `buffers()` | Returns `{dotted.name: mx.array}` of non-trainable persistent state (e.g. BatchNorm running stats). |
+| `state_dict()` | Returns all parameters **and** buffers as a flat dict. |
+| `load_state_dict(sd, strict=True)` | Load a flat state dict (parameters + buffers). |
+| `save(path)` | Save parameters and buffers to `path.npz`. |
+| `load(path)` | Load parameters and buffers from a `.npz` file. |
 
 ---
 
@@ -338,6 +339,8 @@ nn.BatchNorm1d(num_features, eps=1e-5, momentum=0.1)
 
 Both layers switch automatically between batch statistics (training) and running statistics (eval) when you call `model.train()` / `model.eval()`.
 
+Running statistics (`_running_mean`, `_running_var`) are **persistent buffers** — they are saved and loaded by `model.save()` / `model.load()` but are excluded from gradient computation and optimizer updates.
+
 ---
 
 ### Embedding
@@ -463,6 +466,8 @@ loss = uma.mse(predictions, targets)
 # Huber loss — robust to outliers (MSE for small errors, MAE for large)
 loss = uma.huber(predictions, targets, delta=1.0)
 ```
+
+All loss functions accept `reduction="mean"` (default) or `reduction="sum"`. Any other value raises `ValueError`.
 
 ---
 
@@ -630,7 +635,7 @@ model2.load_state_dict(sd)                    # strict: all keys must match
 model2.load_state_dict(sd, strict=False)      # partial load, missing keys skipped
 ```
 
-Keys use dot notation (`conv1.weight`, `fc1.bias`). Inside the file, dots are stored as `/` and converted back on load.
+Keys use dot notation (`conv1.weight`, `fc1.bias`). Inside the file, dots are stored as `/` and converted back on load. `state_dict()` also includes BatchNorm running stats so inference after a round-trip is exact.
 
 ---
 
@@ -641,6 +646,6 @@ Keys use dot notation (`conv1.weight`, `fc1.bias`). Inside the file, dots are st
 | Module containers | Plain Python `list`/`dict` of modules are not tracked. Use `nn.Sequential` or `nn.ModuleList` instead. |
 | `MaxPool2d` | Stride equals kernel size only. Spatial dims must be divisible by `kernel_size`. |
 | Lazy shape errors | MLX validates shapes at eval time, not construction. A wrong-shape `load_state_dict` silently succeeds and crashes on the first forward pass. |
-| BatchNorm running stats | `_running_mean` / `_running_var` in `BatchNorm1d/2d` are not saved by `model.save()` — they are plain Python attributes, not tracked `mx.array`s. For deployment, convert to `LayerNorm` or fold BN into the preceding linear layer. |
+| Early stopping + BatchNorm | Early stopping snapshots only restore trainable parameters and buffers — BatchNorm running stats at the best epoch are not independently tracked. |
 | `value_and_grad` double-runs forward | The gradient closure re-executes `forward` during backprop. Avoid side effects inside `forward`. |
 | Platform | MLX is Apple Silicon only. uma will not run on CUDA or x86. |

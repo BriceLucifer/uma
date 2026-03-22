@@ -50,6 +50,15 @@ class BatchNorm2d(Module):
         self._running_mean = mx.zeros((num_features,))
         self._running_var = mx.ones((num_features,))
 
+    def parameters(self) -> dict[str, mx.array]:
+        """Exclude running stats — they are not trainable parameters."""
+        return {k: v for k, v in super().parameters().items()
+                if not k.startswith("_running_")}
+
+    def buffers(self) -> dict[str, mx.array]:
+        """Expose running stats as persistent non-trainable buffers."""
+        return {"_running_mean": self._running_mean, "_running_var": self._running_var}
+
     def forward(self, x: mx.array) -> mx.array:
         # x: (N, H, W, C)
         if self.training:
@@ -110,6 +119,15 @@ class BatchNorm1d(Module):
 
         self._running_mean = mx.zeros((num_features,))
         self._running_var = mx.ones((num_features,))
+
+    def parameters(self) -> dict[str, mx.array]:
+        """Exclude running stats — they are not trainable parameters."""
+        return {k: v for k, v in super().parameters().items()
+                if not k.startswith("_running_")}
+
+    def buffers(self) -> dict[str, mx.array]:
+        """Expose running stats as persistent non-trainable buffers."""
+        return {"_running_mean": self._running_mean, "_running_var": self._running_var}
 
     def forward(self, x: mx.array) -> mx.array:
         # x: (N, C)

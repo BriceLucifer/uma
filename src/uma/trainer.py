@@ -103,6 +103,9 @@ class Trainer:
             - Early stopping requires val_data + metric_fn when mode="max",
               otherwise it monitors training loss.
         """
+        if early_stopping_patience is not None and early_stopping_mode not in ("min", "max"):
+            raise ValueError(f"early_stopping_mode must be 'min' or 'max', got '{early_stopping_mode}'")
+
         history: dict[str, list[float]] = {"loss": []}
         if val_data is not None and metric_fn is not None:
             history[metric_name] = []
@@ -121,7 +124,7 @@ class Trainer:
                 epoch_loss += self.train_step(x, y)
                 steps += 1
 
-            avg = epoch_loss / steps
+            avg = epoch_loss / steps if steps > 0 else 0.0
             history["loss"].append(avg)
             line = f"epoch {epoch + 1}/{epochs}  loss: {avg:.4f}"
 
@@ -155,7 +158,7 @@ class Trainer:
                 if improved:
                     _best = monitored
                     _wait = 0
-                    _best_params = {k: mx.array(v) for k, v in self.model.parameters().items()}
+                    _best_params = {k: mx.array(v) for k, v in self.model.state_dict().items()}
                 else:
                     _wait += 1
                     if _wait >= early_stopping_patience:

@@ -13,6 +13,8 @@ class Dropout(Module):
     """
 
     def __init__(self, p: float = 0.5) -> None:
+        if not 0.0 <= p < 1.0:
+            raise ValueError(f"Dropout p must be in [0, 1), got {p}")
         self.p = p
         self.training: bool = True
 

@@ -13,8 +13,8 @@ uma is built on top of [MLX](https://github.com/ml-explore/mlx) and gives you Py
 | **Apple Silicon native** | Built on MLX — runs on the M-series GPU with zero device management overhead. |
 | **PyTorch-like API** | Familiar `Module`, `forward`, `parameters()`, `train()`/`eval()` patterns. |
 | **No heavy dependencies** | Only requires `mlx`. No numpy, no torch at runtime. |
-| **Portable weights** | Save and load checkpoints in `.npz` format using `mx.savez` / `mx.load`. |
-| **Built-in eval metrics** | Accuracy, top-k accuracy, and confusion matrix out of the box. |
+| **Portable weights** | Save and load checkpoints (parameters + BatchNorm running stats) in `.npz` format. |
+| **Built-in eval metrics** | Accuracy, top-k, confusion matrix, precision/recall/F1 out of the box. |
 
 ---
 
@@ -61,3 +61,14 @@ model.save("checkpoint")
 ```
 
 Continue to the [Quick Start](quickstart.md) for a full walkthrough.
+
+---
+
+## Examples
+
+| File | Description |
+|------|-------------|
+| [`example/mnist.py`](https://github.com/BriceLucifer/uma/blob/main/example/mnist.py) | Full CNN training on MNIST |
+| [`example/new_features_demo.py`](https://github.com/BriceLucifer/uma/blob/main/example/new_features_demo.py) | Demonstrates all layers, optimizers, schedulers, and losses |
+| [`example/test_saving_loading.py`](https://github.com/BriceLucifer/uma/blob/main/example/test_saving_loading.py) | Save/load round-trip verification |
+| [`example/test_uma.py`](https://github.com/BriceLucifer/uma/blob/main/example/test_uma.py) | Unit tests (67 tests, run with `uv run python example/test_uma.py`) |

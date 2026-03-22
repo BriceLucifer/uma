@@ -51,9 +51,23 @@ class Module:
 
     # ── serialisation ─────────────────────────────────────────────
 
+    def buffers(self) -> dict[str, mx.array]:
+        """Return non-trainable persistent state (e.g. BatchNorm running stats).
+
+        Override in subclasses to expose additional arrays that should be
+        saved/loaded but must NOT receive gradient updates.
+        The base implementation recurses into child Modules automatically.
+        """
+        result: dict[str, mx.array] = {}
+        for name, val in self.__dict__.items():
+            if isinstance(val, Module):
+                for k, v in val.buffers().items():
+                    result[f"{name}.{k}"] = v
+        return result
+
     def state_dict(self) -> dict[str, mx.array]:
-        """Return a flat copy of all parameters (same as parameters())."""
-        return dict(self.parameters())
+        """Return a flat dict of all trainable parameters AND persistent buffers."""
+        return {**self.parameters(), **self.buffers()}
 
     def load_state_dict(self, sd: dict[str, mx.array], strict: bool = True) -> None:
         """Load a state dict produced by state_dict() or uma.bridge.
@@ -70,7 +84,7 @@ class Module:
             - strict=False silently skips keys that don't exist on the model;
               typos in key names will not be caught.
         """
-        own = set(self.parameters().keys())
+        own = set(self.parameters().keys()) | set(self.buffers().keys())
         incoming = set(sd.keys())
         if strict:
             missing = own - incoming
@@ -83,7 +97,7 @@ class Module:
         self.update(filtered)
 
     def save(self, path: str) -> None:
-        """Save parameters to a .npz file.
+        """Save parameters and buffers to a .npz file.
 
         Uses MLX's native mx.savez — no numpy or torch required.
         Dots in key names are stored as '/' (MLX npz convention).
@@ -91,8 +105,9 @@ class Module:
         Usage:
             model.save("weights")    # writes weights.npz
         """
-        mx.eval(list(self.parameters().values()))
-        arrays = {k.replace(".", "/"): v for k, v in self.parameters().items()}
+        sd = self.state_dict()
+        mx.eval(list(sd.values()))
+        arrays = {k.replace(".", "/"): v for k, v in sd.items()}
         mx.savez(path, **arrays)
 
     def load(self, path: str) -> None:

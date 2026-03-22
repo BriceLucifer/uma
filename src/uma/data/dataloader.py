@@ -34,8 +34,6 @@ class DataLoader:
         """Number of batches per epoch (ceiling division)."""
         return (len(self.dataset) + self.batch_size - 1) // self.batch_size
 
-    from typing import Iterator, cast
-
     def __iter__(self) -> Iterator[tuple[mx.array, mx.array]]:
         n = len(self.dataset)
         indices: list[int] = (
