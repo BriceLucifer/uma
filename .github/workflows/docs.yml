@@ -7,14 +7,18 @@ on:
   # allow manual trigger from the Actions tab
   workflow_dispatch:
 
-# allow this workflow to write to GitHub Pages
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4.2.2
@@ -39,5 +43,21 @@ jobs:
       - name: Install uma (so mkdocstrings can import it)
         run: uv pip install --system -e . --no-deps
 
-      - name: Build & deploy to GitHub Pages
-        run: mkdocs gh-deploy --force --clean
+      - name: Build docs
+        run: mkdocs build --clean
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
