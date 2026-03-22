@@ -1,0 +1,43 @@
+name: Deploy Docs
+
+on:
+  push:
+    branches:
+      - main
+  # allow manual trigger from the Actions tab
+  workflow_dispatch:
+
+# allow this workflow to write to GitHub Pages
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so mkdocs git-revision-date works
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install doc dependencies
+        run: |
+          uv pip install --system \
+            "mkdocs>=1.6" \
+            "mkdocs-material>=9.5" \
+            "mkdocstrings[python]>=0.26"
+
+      - name: Install uma (so mkdocstrings can import it)
+        run: uv pip install --system -e . --no-deps
+
+      - name: Build & deploy to GitHub Pages
+        run: mkdocs gh-deploy --force --clean

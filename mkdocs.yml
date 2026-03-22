@@ -1,0 +1,71 @@
+site_name: uma
+site_description: A lightweight neural network framework for Apple Silicon
+site_author: BriceLucifer
+site_url: https://BriceLucifer.github.io/uma/
+repo_url: https://github.com/BriceLucifer/uma
+repo_name: BriceLucifer/uma
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Quick Start: quickstart.md
+  - Guide:
+      - Building Models: guide/modules.md
+      - Training: guide/training.md
+      - Data Pipeline: guide/data.md
+      - Evaluation: guide/evaluation.md
+      - Saving & Loading: guide/weights.md
+  - API Reference:
+      - uma.nn: api/nn.md
+      - uma.optim: api/optim.md
+      - uma.functional: api/functional.md
+      - uma.data: api/data.md
+      - uma.eval: api/eval.md
+      - uma.trainer: api/trainer.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_symbol_type_heading: true
+            members_order: source
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
