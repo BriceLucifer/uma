@@ -5,6 +5,8 @@ from . import eval
 from .functional import (
     cross_entropy,
     mse,
+    binary_cross_entropy,
+    huber,
     l1_regularization,
     l2_regularization,
 )
@@ -18,6 +20,8 @@ __all__ = [
     "Trainer",
     "cross_entropy",
     "mse",
+    "binary_cross_entropy",
+    "huber",
     "l1_regularization",
     "l2_regularization",
 ]

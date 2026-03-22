@@ -1,6 +1,7 @@
 from __future__ import annotations
 import mlx.core as mx
 from .nn.module import Module
+from typing import Literal
 
 
 def accuracy(model: Module, x: mx.array, y: mx.array, batch_size: int = 512) -> float:
@@ -73,3 +74,58 @@ def confusion_matrix(
         for true, pred in zip(yb.tolist(), preds.tolist()):
             cm[int(true)][int(pred)] += 1
     return mx.array(cm, dtype=mx.int32)
+
+
+def precision_recall_f1(
+    model: Module,
+    x: mx.array,
+    y: mx.array,
+    num_classes: int,
+    average: Literal["macro", "micro"] = "macro",
+    batch_size: int = 512,
+) -> tuple[float, float, float]:
+    """Compute precision, recall, and F1 score for multi-class classification.
+
+    Args:
+        model:       The model to evaluate.
+        x:           Input array.
+        y:           Integer class labels, shape ``(N,)``.
+        num_classes: Total number of classes.
+        average:     ``"macro"`` averages per-class metrics equally;
+                     ``"micro"`` aggregates TP/FP/FN globally before dividing.
+        batch_size:  Batch size for inference to avoid OOM.
+
+    Returns:
+        ``(precision, recall, f1)`` as Python floats.
+
+    Example::
+
+        p, r, f1 = uma.eval.precision_recall_f1(model, x_test, y_test, num_classes=10)
+    """
+    cm = confusion_matrix(model, x, y, num_classes, batch_size=batch_size)
+    cm_list = cm.tolist()
+
+    tp = [cm_list[c][c] for c in range(num_classes)]
+    fp = [sum(cm_list[r][c] for r in range(num_classes) if r != c) for c in range(num_classes)]
+    fn = [sum(cm_list[c][k] for k in range(num_classes) if k != c) for c in range(num_classes)]
+
+    if average == "micro":
+        tp_sum = sum(tp)
+        fp_sum = sum(fp)
+        fn_sum = sum(fn)
+        prec = tp_sum / (tp_sum + fp_sum) if (tp_sum + fp_sum) > 0 else 0.0
+        rec = tp_sum / (tp_sum + fn_sum) if (tp_sum + fn_sum) > 0 else 0.0
+        f1 = (2 * prec * rec) / (prec + rec) if (prec + rec) > 0 else 0.0
+        return prec, rec, f1
+
+    # macro
+    precs, recs, f1s = [], [], []
+    for c in range(num_classes):
+        p = tp[c] / (tp[c] + fp[c]) if (tp[c] + fp[c]) > 0 else 0.0
+        r = tp[c] / (tp[c] + fn[c]) if (tp[c] + fn[c]) > 0 else 0.0
+        f = (2 * p * r) / (p + r) if (p + r) > 0 else 0.0
+        precs.append(p)
+        recs.append(r)
+        f1s.append(f)
+
+    return sum(precs) / num_classes, sum(recs) / num_classes, sum(f1s) / num_classes

@@ -33,3 +33,31 @@ class Softmax(Module):
 
     def forward(self, x: mx.array) -> mx.array:
         return mx.softmax(x, axis=self.axis)
+
+
+class Sigmoid(Module):
+    """Sigmoid activation: ``1 / (1 + exp(-x))``."""
+
+    def forward(self, x: mx.array) -> mx.array:
+        return mx.sigmoid(x)
+
+
+class Tanh(Module):
+    """Hyperbolic tangent activation: ``tanh(x)``."""
+
+    def forward(self, x: mx.array) -> mx.array:
+        return mx.tanh(x)
+
+
+class LeakyReLU(Module):
+    """Leaky ReLU: ``x if x > 0 else negative_slope * x``.
+
+    Args:
+        negative_slope: Slope for negative inputs. Default ``0.01``.
+    """
+
+    def __init__(self, negative_slope: float = 0.01) -> None:
+        self.negative_slope = negative_slope
+
+    def forward(self, x: mx.array) -> mx.array:
+        return mx.where(x >= 0, x, self.negative_slope * x)

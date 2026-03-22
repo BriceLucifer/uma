@@ -45,6 +45,51 @@ def mse(
     loss = (predictions - targets) ** 2
     return mx.mean(loss) if reduction == "mean" else mx.sum(loss)
 
+def binary_cross_entropy(
+    logits: mx.array,
+    targets: mx.array,
+    reduction: str = "mean",
+) -> mx.array:
+    """Binary cross-entropy loss from raw logits (sigmoid applied internally).
+
+    Uses the numerically stable form: ``max(x,0) - x*y + log(1+exp(-|x|))``.
+
+    Args:
+        logits: Raw model outputs, shape ``(N,)`` or ``(N, 1)``.
+        targets: Binary labels (0 or 1), same shape as ``logits``.
+        reduction: ``"mean"`` (default) or ``"sum"``.
+
+    Returns:
+        Scalar loss value.
+    """
+    loss = mx.maximum(logits, 0) - logits * targets + mx.log(1 + mx.exp(-mx.abs(logits)))
+    return mx.mean(loss) if reduction == "mean" else mx.sum(loss)
+
+
+def huber(
+    predictions: mx.array,
+    targets: mx.array,
+    delta: float = 1.0,
+    reduction: str = "mean",
+) -> mx.array:
+    """Huber (smooth L1) loss — less sensitive to outliers than MSE.
+
+    For ``|error| <= delta`` behaves like MSE; for larger errors like MAE.
+
+    Args:
+        predictions: Model outputs, any shape.
+        targets: Ground-truth values, same shape as ``predictions``.
+        delta: Threshold between quadratic and linear regions. Default ``1.0``.
+        reduction: ``"mean"`` (default) or ``"sum"``.
+
+    Returns:
+        Scalar loss value.
+    """
+    err = mx.abs(predictions - targets)
+    loss = mx.where(err <= delta, 0.5 * err ** 2, delta * (err - 0.5 * delta))
+    return mx.mean(loss) if reduction == "mean" else mx.sum(loss)
+
+
 # regularization
 def l2_regularization(
     params: dict[str, mx.array],

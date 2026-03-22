@@ -13,21 +13,28 @@ uma gives you PyTorch-style module composition, automatic differentiation, and t
 - [Core concepts](#core-concepts)
 - [Modules — `uma.nn`](#modules--umann)
   - [Module base class](#module-base-class)
+  - [Sequential & ModuleList](#sequential--modulelist)
   - [Linear](#linear)
   - [Conv2d](#conv2d)
   - [MaxPool2d](#maxpool2d)
   - [Activations](#activations)
   - [Dropout](#dropout)
   - [LayerNorm](#layernorm)
+  - [BatchNorm](#batchnorm)
+  - [Embedding](#embedding)
 - [Optimizers — `uma.optim`](#optimizers--umaoptim)
   - [SGD](#sgd)
   - [Adam](#adam)
+  - [AdamW](#adamw)
+  - [LR Schedulers](#lr-schedulers)
 - [Loss functions — `uma.functional`](#loss-functions--umafunctional)
 - [Regularization](#regularization)
 - [Data — `uma.data`](#data--umadata)
   - [Dataset](#dataset)
   - [DataLoader](#dataloader)
 - [Trainer](#trainer)
+  - [Gradient clipping](#gradient-clipping)
+  - [Early stopping](#early-stopping)
 - [Evaluation — `uma.eval`](#evaluation--umaeval)
 - [Saving and loading weights](#saving-and-loading-weights)
 - [Known limitations](#known-limitations)
@@ -112,20 +119,54 @@ All uma conv and pooling layers expect channels-last input.
 
 ### Parameter tracking
 
-uma tracks parameters by inspecting `self.__dict__` recursively. Every `mx.array` attribute on a `Module`, and every `mx.array` inside a child `Module` attribute, is a parameter. **Python lists and dicts of modules are not traversed** — all sub-layers must be direct attributes:
+uma tracks parameters by inspecting `self.__dict__` recursively. Every `mx.array` attribute on a `Module`, and every `mx.array` inside a child `Module` attribute, is a parameter. **Plain Python lists and dicts of modules are not traversed** — use `nn.ModuleList` or direct attributes instead:
 
 ```python
-# correct
+# correct — direct attribute
 self.conv1 = nn.Conv2d(...)
 self.conv2 = nn.Conv2d(...)
 
-# wrong — parameters inside the list will not be tracked
+# correct — ModuleList registers sub-modules properly
+self.layers = nn.ModuleList([nn.Linear(64, 64) for _ in range(4)])
+
+# wrong — parameters inside a plain list are NOT tracked
 self.layers = [nn.Conv2d(...), nn.Conv2d(...)]
 ```
 
 ---
 
 ## Modules — `uma.nn`
+
+### Sequential & ModuleList
+
+**`nn.Sequential`** chains modules in order — the output of each layer is the input to the next:
+
+```python
+model = nn.Sequential(
+    nn.Linear(784, 256),
+    nn.ReLU(),
+    nn.Linear(256, 128),
+    nn.ReLU(),
+    nn.Linear(128, 10),
+)
+out = model(x)   # calls each layer in sequence
+```
+
+**`nn.ModuleList`** stores a list of modules and registers their parameters for tracking. Use it when you need to iterate manually (e.g. residual connections):
+
+```python
+class ResBlock(nn.Module):
+    def __init__(self, dim, n_layers):
+        self.layers = nn.ModuleList([nn.Linear(dim, dim) for _ in range(n_layers)])
+        self.act = nn.ReLU()
+
+    def forward(self, x):
+        for i in range(len(self.layers)):
+            x = x + self.act(self.layers[i](x))   # residual
+        return x
+```
+
+---
 
 ### Module base class
 
@@ -218,14 +259,17 @@ y = pool(x)
 
 ### Activations
 
-| Class | Formula |
-|-------|---------|
-| `nn.ReLU()` | `max(x, 0)` |
-| `nn.GELU()` | `0.5x(1 + tanh(√(2/π)(x + 0.044715x³)))` |
-| `nn.Softmax(axis=-1)` | `exp(xᵢ) / Σexp(xⱼ)` along `axis` |
+| Class | Formula | Notes |
+|-------|---------|-------|
+| `nn.ReLU()` | `max(x, 0)` | |
+| `nn.GELU()` | `0.5x(1 + tanh(√(2/π)(x + 0.044715x³)))` | |
+| `nn.Softmax(axis=-1)` | `exp(xᵢ) / Σexp(xⱼ)` along `axis` | |
+| `nn.Sigmoid()` | `1 / (1 + exp(-x))` | Binary classification output |
+| `nn.Tanh()` | `tanh(x)` | Output range (-1, 1) |
+| `nn.LeakyReLU(negative_slope=0.01)` | `x if x>0 else slope·x` | Avoids dying ReLU |
 
 ```python
-act = nn.GELU()
+act = nn.LeakyReLU(negative_slope=0.2)
 y = act(x)
 ```
 
@@ -269,6 +313,51 @@ y = norm(x)   # x: (N, 256)
 
 ---
 
+### BatchNorm
+
+**`nn.BatchNorm2d`** normalises over the spatial dimensions (N, H, W) for each channel in a feature map. Use after `Conv2d` layers.
+
+```python
+nn.BatchNorm2d(num_features, eps=1e-5, momentum=0.1)
+```
+
+Input shape: `(N, H, W, C)` — channels-last, matching MLX's convention.
+
+```python
+self.bn = nn.BatchNorm2d(32)
+# in forward:
+x = self.bn(x)   # shape (N, H, W, 32)
+```
+
+**`nn.BatchNorm1d`** normalises over the batch dimension for 1D features:
+
+```python
+nn.BatchNorm1d(num_features, eps=1e-5, momentum=0.1)
+# input (N, C) → output (N, C)
+```
+
+Both layers switch automatically between batch statistics (training) and running statistics (eval) when you call `model.train()` / `model.eval()`.
+
+---
+
+### Embedding
+
+Lookup table for integer token indices.
+
+```python
+nn.Embedding(num_embeddings, embedding_dim)
+```
+
+```python
+embed = nn.Embedding(10000, 128)
+tokens = mx.array([[1, 42, 7]])    # (1, 3) — integer indices
+out = embed(tokens)                # (1, 3, 128)
+```
+
+Useful for word embeddings, positional encodings, or any categorical input.
+
+---
+
 ## Optimizers — `uma.optim`
 
 All optimizers are constructed with the model's parameter dict and a learning rate, then used via `trainer.fit` or manually:
@@ -303,6 +392,57 @@ v̂ = v / (1 - β₂ᵗ)
 θ ← θ - lr · m̂ / (√v̂ + ε)
 ```
 
+### AdamW
+
+Adam with **decoupled weight decay** — weight decay is applied directly to parameters rather than through the gradient, giving better regularization with adaptive methods.
+
+```python
+optim.AdamW(params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-2)
+```
+
+Update rule (extra term vs Adam):
+```
+θ ← θ - lr · m̂/(√v̂ + ε) - lr · weight_decay · θ
+```
+
+---
+
+### LR Schedulers
+
+Schedulers wrap an optimizer and call `.step()` once per epoch to adjust the learning rate.
+
+**`StepLR`** — multiply lr by `gamma` every `step_size` epochs:
+
+```python
+scheduler = optim.StepLR(optimizer, step_size=5, gamma=0.5)
+```
+
+**`CosineAnnealingLR`** — decay lr from initial down to `eta_min` following a cosine curve over `T_max` epochs:
+
+```python
+scheduler = optim.CosineAnnealingLR(optimizer, T_max=20, eta_min=1e-6)
+```
+
+**`ReduceLROnPlateau`** — reduce lr when a metric stops improving (no need to know the epoch count in advance):
+
+```python
+scheduler = optim.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5)
+```
+
+Pass the scheduler to `trainer.fit`:
+
+```python
+history = trainer.fit(
+    loader, epochs=50,
+    val_data=(val_x, val_y),
+    metric_fn=uma.eval.accuracy,
+    metric_name="acc",
+    scheduler=scheduler,
+)
+```
+
+`ReduceLROnPlateau.step(metric)` is called automatically with the validation metric; other schedulers call `.step()` with no argument.
+
 ---
 
 ## Loss functions — `uma.functional`
@@ -310,13 +450,18 @@ v̂ = v / (1 - β₂ᵗ)
 ```python
 import uma
 
-# classification — targets are integer class indices, not one-hot
+# multi-class classification — targets are integer class indices, not one-hot
 loss = uma.cross_entropy(logits, targets)
 loss = uma.cross_entropy(logits, targets, reduction="sum")
 
+# binary classification — from raw logits (sigmoid applied internally)
+loss = uma.binary_cross_entropy(logits, targets)   # targets: 0 or 1
+
 # regression
 loss = uma.mse(predictions, targets)
-loss = uma.mse(predictions, targets, reduction="sum")
+
+# Huber loss — robust to outliers (MSE for small errors, MAE for large)
+loss = uma.huber(predictions, targets, delta=1.0)
 ```
 
 ---
@@ -406,6 +551,32 @@ epoch 2/10  loss: 0.3198  acc: 0.9102
 
 **`fit` returns** a dict with `"loss"` and the `metric_name` key (if `val_data` was provided).
 
+### Gradient clipping
+
+Pass `clip_grad_norm` to `Trainer` to clip the global L2 norm of gradients before each optimizer step. Useful when training RNNs or deep networks prone to exploding gradients.
+
+```python
+trainer = Trainer(model, optimizer, loss_fn, clip_grad_norm=1.0)
+```
+
+### Early stopping
+
+Stop training automatically when the monitored metric stops improving, and restore the best weights seen so far.
+
+```python
+history = trainer.fit(
+    loader,
+    epochs=100,
+    val_data=(val_x, val_y),
+    metric_fn=uma.eval.accuracy,
+    metric_name="acc",
+    early_stopping_patience=10,      # stop after 10 epochs without improvement
+    early_stopping_mode="max",       # "max" for accuracy, "min" for loss
+)
+```
+
+When `val_data` + `metric_fn` are provided, early stopping monitors the validation metric; otherwise it monitors training loss.
+
 ---
 
 ## Evaluation — `uma.eval`
@@ -426,9 +597,13 @@ top5 = ueval.top_k_accuracy(model, test_x, test_y, k=5)
 # confusion matrix: entry [i,j] = samples with true label i predicted as j
 cm = ueval.confusion_matrix(model, test_x, test_y, num_classes=10)
 # → mx.array shape (10, 10), dtype int32
+
+# precision, recall, F1
+p, r, f1 = ueval.precision_recall_f1(model, test_x, test_y, num_classes=10)
+p, r, f1 = ueval.precision_recall_f1(model, test_x, test_y, num_classes=10, average="micro")
 ```
 
-Optional `batch_size` parameter on all three (default `512`).
+Optional `batch_size` parameter on all functions (default `512`).
 
 > `y` must be integer class indices (`uint32` or `int32`), not one-hot vectors.
 
@@ -463,9 +638,9 @@ Keys use dot notation (`conv1.weight`, `fc1.bias`). Inside the file, dots are st
 
 | Area | Limitation |
 |------|------------|
-| Module containers | `self.layers = [Conv2d(...)]` is not tracked. All sub-layers must be direct `self.x = Module(...)` attributes. |
+| Module containers | Plain Python `list`/`dict` of modules are not tracked. Use `nn.Sequential` or `nn.ModuleList` instead. |
 | `MaxPool2d` | Stride equals kernel size only. Spatial dims must be divisible by `kernel_size`. |
 | Lazy shape errors | MLX validates shapes at eval time, not construction. A wrong-shape `load_state_dict` silently succeeds and crashes on the first forward pass. |
-| No BatchNorm | Only `LayerNorm` is available. BatchNorm requires tracked running statistics per batch. |
+| BatchNorm running stats | `_running_mean` / `_running_var` in `BatchNorm1d/2d` are not saved by `model.save()` — they are plain Python attributes, not tracked `mx.array`s. For deployment, convert to `LayerNorm` or fold BN into the preceding linear layer. |
 | `value_and_grad` double-runs forward | The gradient closure re-executes `forward` during backprop. Avoid side effects inside `forward`. |
 | Platform | MLX is Apple Silicon only. uma will not run on CUDA or x86. |
