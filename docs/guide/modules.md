@@ -156,6 +156,116 @@ for i in range(len(self.layers)):
     x = x + self.layers[i](x)
 ```
 
+### RNN
+
+Elman recurrent network over sequences of shape `(batch, seq_len, input_size)`.
+Supports stacking with `num_layers`.
+
+```python
+rnn = nn.RNN(input_size=32, hidden_size=64, num_layers=2, nonlinearity="tanh")
+x   = mx.random.normal((8, 10, 32))   # (batch, seq, features)
+out = rnn(x)                           # (8, 10, 64) — output of the last layer
+
+# h0 options:
+out = rnn(x, h0=mx.zeros((8, 64)))        # (batch, H)   — broadcast to all layers
+out = rnn(x, h0=mx.zeros((2, 8, 64)))     # (num_layers, batch, H) — per-layer
+```
+
+| Arg | Default | Description |
+|-----|---------|-------------|
+| `input_size` | — | Features per timestep |
+| `hidden_size` | — | Size of the hidden state |
+| `num_layers` | `1` | Number of stacked layers |
+| `nonlinearity` | `"tanh"` | `"tanh"` or `"relu"` |
+| `bias` | `True` | Whether to add bias terms |
+
+### LSTM
+
+Long Short-Term Memory network. Returns the full hidden-state sequence of the last layer.
+
+```python
+lstm = nn.LSTM(input_size=32, hidden_size=128, num_layers=2)
+x    = mx.random.normal((4, 20, 32))   # (batch, seq, features)
+out  = lstm(x)                          # (4, 20, 128)
+
+# state=(h0, c0) options:
+out = lstm(x, state=(mx.zeros((4, 128)),   mx.zeros((4, 128))))    # broadcast
+out = lstm(x, state=(mx.zeros((2, 4, 128)), mx.zeros((2, 4, 128)))) # per-layer
+```
+
+The hidden state output is bounded in `(-1, 1)` (product of tanh and sigmoid gates).
+
+### GRU
+
+Gated Recurrent Unit — fewer parameters than LSTM, similar capacity.
+
+```python
+gru = nn.GRU(input_size=32, hidden_size=64, num_layers=2)
+x   = mx.random.normal((4, 15, 32))    # (batch, seq, features)
+out = gru(x)                            # (4, 15, 64)
+
+# h0 options:
+out = gru(x, h0=mx.zeros((4, 64)))       # (batch, H)   — broadcast
+out = gru(x, h0=mx.zeros((2, 4, 64)))    # (num_layers, batch, H) — per-layer
+```
+
+### MultiheadAttention
+
+Scaled dot-product attention with `num_heads` parallel heads.
+
+```python
+attn = nn.MultiheadAttention(embed_dim=128, num_heads=8)
+x    = mx.random.normal((4, 20, 128))   # (batch, seq, embed_dim)
+out  = attn(x, x, x)                   # self-attention → (4, 20, 128)
+
+# Cross-attention:
+q   = mx.random.normal((4, 5, 128))
+kv  = mx.random.normal((4, 20, 128))
+out = attn(q, kv, kv)                  # (4, 5, 128)
+
+# Causal mask (upper-triangular additive):
+T    = x.shape[1]
+mask = mx.triu(mx.full((T, T), -1e9), k=1)
+out  = attn(x, x, x, mask=mask)
+```
+
+`embed_dim` must be divisible by `num_heads`.
+
+### TransformerEncoderLayer
+
+A single Post-LN Transformer encoder block (self-attention + feed-forward).
+
+```python
+layer = nn.TransformerEncoderLayer(
+    d_model=128,
+    nhead=8,
+    dim_feedforward=512,   # default: 4 * d_model
+    dropout=0.1,
+    activation="relu",     # "relu" or "gelu"
+)
+x   = mx.random.normal((4, 20, 128))
+out = layer(x)             # (4, 20, 128)
+```
+
+### TransformerEncoder
+
+Stacks `num_layers` copies of a `TransformerEncoderLayer` with independent weights.
+
+```python
+layer   = nn.TransformerEncoderLayer(d_model=128, nhead=8, dropout=0.1)
+encoder = nn.TransformerEncoder(layer, num_layers=6)
+x       = mx.random.normal((4, 20, 128))
+out     = encoder(x)   # (4, 20, 128)
+```
+
+!!! tip "Gradient clipping for recurrent models"
+    RNNs, LSTMs, and GRUs are prone to exploding gradients. Pass
+    `clip_grad_norm=1.0` to `Trainer` when training them.
+
+    ```python
+    trainer = Trainer(model, optimizer, loss_fn, clip_grad_norm=1.0)
+    ```
+
 ---
 
 ## Channels-last convention

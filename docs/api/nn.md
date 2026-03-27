@@ -103,3 +103,39 @@ Neural network modules. All layers inherit from `Module`.
 ## ModuleList
 
 ::: uma.nn.ModuleList
+
+---
+
+## RNN
+
+::: uma.nn.RNN
+
+---
+
+## LSTM
+
+::: uma.nn.LSTM
+
+---
+
+## GRU
+
+::: uma.nn.GRU
+
+---
+
+## MultiheadAttention
+
+::: uma.nn.MultiheadAttention
+
+---
+
+## TransformerEncoderLayer
+
+::: uma.nn.TransformerEncoderLayer
+
+---
+
+## TransformerEncoder
+
+::: uma.nn.TransformerEncoder

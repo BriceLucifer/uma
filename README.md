@@ -22,6 +22,10 @@ uma gives you PyTorch-style module composition, automatic differentiation, and t
   - [LayerNorm](#layernorm)
   - [BatchNorm](#batchnorm)
   - [Embedding](#embedding)
+  - [RNN](#rnn)
+  - [LSTM](#lstm)
+  - [GRU](#gru)
+  - [Transformer](#transformer)
 - [Optimizers — `uma.optim`](#optimizers--umaoptim)
   - [SGD](#sgd)
   - [Adam](#adam)
@@ -358,6 +362,115 @@ out = embed(tokens)                # (1, 3, 128)
 ```
 
 Useful for word embeddings, positional encodings, or any categorical input.
+
+---
+
+### RNN
+
+Elman recurrent network with tanh or ReLU nonlinearity, optionally stacked.
+
+```python
+nn.RNN(input_size, hidden_size, num_layers=1, nonlinearity="tanh", bias=True)
+```
+
+- Input: `(batch, seq_len, input_size)` → Output: `(batch, seq_len, hidden_size)` (last layer)
+- `nonlinearity`: `"tanh"` (default) or `"relu"`
+- `h0` shapes: omit (zeros) | `(batch, H)` broadcast | `(num_layers, batch, H)` per-layer
+
+```python
+rnn = nn.RNN(32, 64, num_layers=2)
+out = rnn(x)           # x: (B, T, 32) → out: (B, T, 64)
+out = rnn(x, h0=h0)   # h0: (2, B, 64)
+```
+
+---
+
+### LSTM
+
+Long Short-Term Memory with input, forget, cell, and output gates, optionally stacked.
+
+```python
+nn.LSTM(input_size, hidden_size, num_layers=1, bias=True)
+```
+
+- Input: `(batch, seq_len, input_size)` → Output: `(batch, seq_len, hidden_size)` (last layer)
+- `state=(h0, c0)` shapes: omit (zeros) | each `(batch, H)` broadcast | each `(num_layers, batch, H)` per-layer
+
+```python
+lstm = nn.LSTM(32, 128, num_layers=2)
+out  = lstm(x)                  # x: (B, T, 32) → out: (B, T, 128)
+out  = lstm(x, state=(h0, c0))  # h0, c0: (2, B, 128)
+```
+
+---
+
+### GRU
+
+Gated Recurrent Unit — fewer parameters than LSTM, similar capacity, optionally stacked.
+
+```python
+nn.GRU(input_size, hidden_size, num_layers=1, bias=True)
+```
+
+- Input: `(batch, seq_len, input_size)` → Output: `(batch, seq_len, hidden_size)` (last layer)
+- `h0` shapes: omit (zeros) | `(batch, H)` broadcast | `(num_layers, batch, H)` per-layer
+
+```python
+gru = nn.GRU(32, 64, num_layers=2)
+out = gru(x)           # x: (B, T, 32) → out: (B, T, 64)
+out = gru(x, h0=h0)   # h0: (2, B, 64)
+```
+
+---
+
+### Transformer
+
+**`nn.MultiheadAttention`** — scaled dot-product attention with `num_heads` parallel heads.
+
+```python
+nn.MultiheadAttention(embed_dim, num_heads, dropout=0.0, bias=True)
+```
+
+- `embed_dim` must be divisible by `num_heads`
+- `forward(query, key, value, mask=None)` — mask is an **additive** bias (use `-1e9` to block positions)
+
+```python
+attn = nn.MultiheadAttention(128, 8)
+out  = attn(x, x, x)            # self-attention: (B, T, 128)
+out  = attn(q, k, v, mask=mask) # cross/causal attention
+```
+
+**`nn.TransformerEncoderLayer`** — one Post-LN encoder block (self-attention + feed-forward).
+
+```python
+nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward=None, dropout=0.0, activation="relu")
+```
+
+- `activation`: `"relu"` (default) or `"gelu"`
+- `dim_feedforward` defaults to `4 * d_model`
+
+```python
+layer = nn.TransformerEncoderLayer(128, 8, dropout=0.1)
+out   = layer(x)              # (B, T, 128)
+out   = layer(x, mask=mask)   # with causal or padding mask
+```
+
+**`nn.TransformerEncoder`** — stacks `num_layers` encoder layers with independent weights.
+
+```python
+nn.TransformerEncoder(encoder_layer, num_layers)
+```
+
+```python
+layer   = nn.TransformerEncoderLayer(128, 8, dropout=0.1)
+encoder = nn.TransformerEncoder(layer, num_layers=6)
+out     = encoder(x)           # (B, T, 128)
+```
+
+> **Tip:** RNNs, LSTMs, and GRUs are prone to exploding gradients. Use `clip_grad_norm=1.0` in `Trainer`:
+> ```python
+> trainer = Trainer(model, optimizer, loss_fn, clip_grad_norm=1.0)
+> ```
 
 ---
 

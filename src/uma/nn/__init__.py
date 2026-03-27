@@ -7,6 +7,8 @@ from .conv import Conv2d, MaxPool2d
 from .batchnorm import BatchNorm1d, BatchNorm2d
 from .embedding import Embedding
 from .containers import Sequential, ModuleList
+from .recurrent import RNN, LSTM, GRU
+from .transformer import MultiheadAttention, TransformerEncoderLayer, TransformerEncoder
 
 __all__ = [
     "Module",
@@ -17,4 +19,6 @@ __all__ = [
     "Conv2d", "MaxPool2d",
     "Embedding",
     "Sequential", "ModuleList",
+    "RNN", "LSTM", "GRU",
+    "MultiheadAttention", "TransformerEncoderLayer", "TransformerEncoder",
 ]

@@ -636,6 +636,304 @@ class TestTrainer(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# nn/recurrent.py
+# ══════════════════════════════════════════════════════════════════════════
+
+class TestRNN(unittest.TestCase):
+
+    def test_output_shape(self):
+        rnn = nn.RNN(input_size=16, hidden_size=32)
+        x = mx.random.normal((4, 10, 16))
+        out = rnn(x)
+        mx.eval(out)
+        self.assertEqual(out.shape, (4, 10, 32))
+
+    def test_custom_h0_2d(self):
+        rnn = nn.RNN(input_size=8, hidden_size=16)
+        x = mx.random.normal((2, 5, 8))
+        h0 = mx.zeros((2, 16))
+        out = rnn(x, h0=h0)
+        mx.eval(out)
+        self.assertEqual(out.shape, (2, 5, 16))
+
+    def test_relu_nonlinearity(self):
+        rnn = nn.RNN(input_size=4, hidden_size=8, nonlinearity="relu")
+        x = mx.random.normal((2, 3, 4))
+        out = rnn(x)
+        mx.eval(out)
+        self.assertTrue((out >= 0).all().item())
+
+    def test_invalid_nonlinearity(self):
+        with self.assertRaises(ValueError):
+            nn.RNN(4, 8, nonlinearity="sigmoid")
+
+    def test_invalid_num_layers(self):
+        with self.assertRaises(ValueError):
+            nn.RNN(4, 8, num_layers=0)
+
+    def test_parameters_tracked(self):
+        rnn = nn.RNN(4, 8)
+        params = rnn.parameters()
+        self.assertIn("_layer_0.ih.weight", params)
+        self.assertIn("_layer_0.hh.weight", params)
+
+    def test_no_bias(self):
+        rnn = nn.RNN(4, 8, bias=False)
+        params = rnn.parameters()
+        self.assertNotIn("_layer_0.ih.bias", params)
+
+    def test_multilayer_output_shape(self):
+        rnn = nn.RNN(input_size=16, hidden_size=32, num_layers=3)
+        x = mx.random.normal((4, 10, 16))
+        out = rnn(x)
+        mx.eval(out)
+        self.assertEqual(out.shape, (4, 10, 32))
+
+    def test_multilayer_parameters_tracked(self):
+        rnn = nn.RNN(4, 8, num_layers=2)
+        params = rnn.parameters()
+        self.assertIn("_layer_0.ih.weight", params)
+        self.assertIn("_layer_1.ih.weight", params)
+
+    def test_multilayer_h0_per_layer(self):
+        rnn = nn.RNN(input_size=8, hidden_size=16, num_layers=2)
+        x = mx.random.normal((2, 5, 8))
+        h0 = mx.zeros((2, 2, 16))  # (num_layers, batch, hidden)
+        out = rnn(x, h0=h0)
+        mx.eval(out)
+        self.assertEqual(out.shape, (2, 5, 16))
+
+
+class TestLSTM(unittest.TestCase):
+
+    def test_output_shape(self):
+        lstm = nn.LSTM(input_size=16, hidden_size=32)
+        x = mx.random.normal((4, 10, 16))
+        out = lstm(x)
+        mx.eval(out)
+        self.assertEqual(out.shape, (4, 10, 32))
+
+    def test_custom_state_2d(self):
+        lstm = nn.LSTM(input_size=8, hidden_size=16)
+        x = mx.random.normal((2, 5, 8))
+        h0 = mx.zeros((2, 16))
+        c0 = mx.zeros((2, 16))
+        out = lstm(x, state=(h0, c0))
+        mx.eval(out)
+        self.assertEqual(out.shape, (2, 5, 16))
+
+    def test_parameters_tracked(self):
+        lstm = nn.LSTM(4, 8)
+        params = lstm.parameters()
+        self.assertIn("_layer_0.ih.weight", params)
+        self.assertIn("_layer_0.hh.weight", params)
+
+    def test_output_bounded(self):
+        lstm = nn.LSTM(input_size=4, hidden_size=8)
+        x = mx.random.normal((2, 5, 4))
+        out = lstm(x)
+        mx.eval(out)
+        self.assertTrue((out > -1).all().item())
+        self.assertTrue((out < 1).all().item())
+
+    def test_no_bias(self):
+        lstm = nn.LSTM(4, 8, bias=False)
+        params = lstm.parameters()
+        self.assertNotIn("_layer_0.ih.bias", params)
+
+    def test_multilayer_output_shape(self):
+        lstm = nn.LSTM(input_size=16, hidden_size=32, num_layers=3)
+        x = mx.random.normal((4, 10, 16))
+        out = lstm(x)
+        mx.eval(out)
+        self.assertEqual(out.shape, (4, 10, 32))
+
+    def test_multilayer_parameters_tracked(self):
+        lstm = nn.LSTM(4, 8, num_layers=2)
+        params = lstm.parameters()
+        self.assertIn("_layer_0.ih.weight", params)
+        self.assertIn("_layer_1.ih.weight", params)
+
+    def test_multilayer_state_per_layer(self):
+        lstm = nn.LSTM(input_size=8, hidden_size=16, num_layers=2)
+        x = mx.random.normal((2, 5, 8))
+        h0 = mx.zeros((2, 2, 16))  # (num_layers, batch, hidden)
+        c0 = mx.zeros((2, 2, 16))
+        out = lstm(x, state=(h0, c0))
+        mx.eval(out)
+        self.assertEqual(out.shape, (2, 5, 16))
+
+
+class TestGRU(unittest.TestCase):
+
+    def test_output_shape(self):
+        gru = nn.GRU(input_size=16, hidden_size=32)
+        x = mx.random.normal((4, 10, 16))
+        out = gru(x)
+        mx.eval(out)
+        self.assertEqual(out.shape, (4, 10, 32))
+
+    def test_custom_h0_2d(self):
+        gru = nn.GRU(input_size=8, hidden_size=16)
+        x = mx.random.normal((2, 5, 8))
+        h0 = mx.zeros((2, 16))
+        out = gru(x, h0=h0)
+        mx.eval(out)
+        self.assertEqual(out.shape, (2, 5, 16))
+
+    def test_parameters_tracked(self):
+        gru = nn.GRU(4, 8)
+        params = gru.parameters()
+        self.assertIn("_layer_0.ih_rz.weight", params)
+        self.assertIn("_layer_0.hh_rz.weight", params)
+        self.assertIn("_layer_0.ih_n.weight", params)
+        self.assertIn("_layer_0.hh_n.weight", params)
+
+    def test_no_bias(self):
+        gru = nn.GRU(4, 8, bias=False)
+        params = gru.parameters()
+        self.assertNotIn("_layer_0.ih_rz.bias", params)
+
+    def test_output_bounded(self):
+        gru = nn.GRU(input_size=4, hidden_size=8)
+        x = mx.random.normal((2, 5, 4))
+        out = gru(x)
+        mx.eval(out)
+        self.assertTrue((out > -1).all().item())
+        self.assertTrue((out < 1).all().item())
+
+    def test_multilayer_output_shape(self):
+        gru = nn.GRU(input_size=16, hidden_size=32, num_layers=3)
+        x = mx.random.normal((4, 10, 16))
+        out = gru(x)
+        mx.eval(out)
+        self.assertEqual(out.shape, (4, 10, 32))
+
+    def test_multilayer_parameters_tracked(self):
+        gru = nn.GRU(4, 8, num_layers=2)
+        params = gru.parameters()
+        self.assertIn("_layer_0.ih_rz.weight", params)
+        self.assertIn("_layer_1.ih_rz.weight", params)
+
+    def test_multilayer_h0_per_layer(self):
+        gru = nn.GRU(input_size=8, hidden_size=16, num_layers=2)
+        x = mx.random.normal((2, 5, 8))
+        h0 = mx.zeros((2, 2, 16))  # (num_layers, batch, hidden)
+        out = gru(x, h0=h0)
+        mx.eval(out)
+        self.assertEqual(out.shape, (2, 5, 16))
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# nn/transformer.py
+# ══════════════════════════════════════════════════════════════════════════
+
+class TestMultiheadAttention(unittest.TestCase):
+
+    def test_output_shape(self):
+        attn = nn.MultiheadAttention(embed_dim=64, num_heads=4)
+        x = mx.random.normal((2, 10, 64))
+        out = attn(x, x, x)
+        mx.eval(out)
+        self.assertEqual(out.shape, (2, 10, 64))
+
+    def test_cross_attention_shape(self):
+        attn = nn.MultiheadAttention(embed_dim=64, num_heads=4)
+        q = mx.random.normal((2, 5, 64))
+        kv = mx.random.normal((2, 12, 64))
+        out = attn(q, kv, kv)
+        mx.eval(out)
+        self.assertEqual(out.shape, (2, 5, 64))
+
+    def test_invalid_num_heads(self):
+        with self.assertRaises(ValueError):
+            nn.MultiheadAttention(embed_dim=64, num_heads=5)  # 64 % 5 != 0
+
+    def test_mask_applied(self):
+        # Causal mask: upper triangle should be blocked
+        attn = nn.MultiheadAttention(embed_dim=32, num_heads=2)
+        x = mx.random.normal((1, 4, 32))
+        T = 4
+        mask = mx.triu(mx.full((T, T), -1e9), k=1)
+        out = attn(x, x, x, mask=mask)
+        mx.eval(out)
+        self.assertEqual(out.shape, (1, 4, 32))
+
+    def test_parameters_tracked(self):
+        attn = nn.MultiheadAttention(embed_dim=32, num_heads=2)
+        params = attn.parameters()
+        self.assertIn("q_proj.weight", params)
+        self.assertIn("k_proj.weight", params)
+        self.assertIn("v_proj.weight", params)
+        self.assertIn("out_proj.weight", params)
+
+
+class TestTransformerEncoderLayer(unittest.TestCase):
+
+    def test_output_shape(self):
+        layer = nn.TransformerEncoderLayer(d_model=64, nhead=4)
+        x = mx.random.normal((2, 10, 64))
+        out = layer(x)
+        mx.eval(out)
+        self.assertEqual(out.shape, (2, 10, 64))
+
+    def test_gelu_activation(self):
+        layer = nn.TransformerEncoderLayer(d_model=32, nhead=2, activation="gelu")
+        x = mx.random.normal((1, 5, 32))
+        out = layer(x)
+        mx.eval(out)
+        self.assertEqual(out.shape, (1, 5, 32))
+
+    def test_invalid_activation(self):
+        with self.assertRaises(ValueError):
+            nn.TransformerEncoderLayer(d_model=32, nhead=2, activation="swish")
+
+    def test_custom_feedforward_dim(self):
+        layer = nn.TransformerEncoderLayer(d_model=32, nhead=2, dim_feedforward=64)
+        params = layer.parameters()
+        self.assertEqual(params["ff1.weight"].shape, (32, 64))
+
+    def test_with_mask(self):
+        layer = nn.TransformerEncoderLayer(d_model=32, nhead=2)
+        x = mx.random.normal((1, 6, 32))
+        mask = mx.triu(mx.full((6, 6), -1e9), k=1)
+        out = layer(x, mask=mask)
+        mx.eval(out)
+        self.assertEqual(out.shape, (1, 6, 32))
+
+
+class TestTransformerEncoder(unittest.TestCase):
+
+    def test_output_shape(self):
+        layer = nn.TransformerEncoderLayer(d_model=64, nhead=4)
+        encoder = nn.TransformerEncoder(layer, num_layers=3)
+        x = mx.random.normal((2, 10, 64))
+        out = encoder(x)
+        mx.eval(out)
+        self.assertEqual(out.shape, (2, 10, 64))
+
+    def test_independent_layers(self):
+        # Each layer must be a distinct Python object (deep copy, not an alias)
+        layer = nn.TransformerEncoderLayer(d_model=32, nhead=2)
+        encoder = nn.TransformerEncoder(layer, num_layers=2)
+        params = encoder.parameters()
+        self.assertIn("_layer_0.ff1.weight", params)
+        self.assertIn("_layer_1.ff1.weight", params)
+        # The two layer objects must be distinct instances
+        layer0 = encoder._layer_0
+        layer1 = encoder._layer_1
+        self.assertIsNot(layer0, layer1)
+
+    def test_num_layers_one(self):
+        layer = nn.TransformerEncoderLayer(d_model=32, nhead=2)
+        encoder = nn.TransformerEncoder(layer, num_layers=1)
+        x = mx.random.normal((1, 4, 32))
+        out = encoder(x)
+        mx.eval(out)
+        self.assertEqual(out.shape, (1, 4, 32))
+
+
+# ══════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
